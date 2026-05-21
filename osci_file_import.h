@@ -40,15 +40,6 @@
 #include "osci_FrameConsumer.h"
 #include "osci_FrameSource.h"
 #include "osci_FrameProducer.h"
-
-#if OSCI_FILE_IMPORT_ENABLE_SVG
 #include "svg/osci_SvgParser.h"
-#endif
-
-#if OSCI_FILE_IMPORT_ENABLE_TXT
 #include "txt/osci_TextParser.h"
-#endif
-
-#if OSCI_FILE_IMPORT_ENABLE_GPLA
 #include "gpla/osci_LineArtParser.h"
-#endif

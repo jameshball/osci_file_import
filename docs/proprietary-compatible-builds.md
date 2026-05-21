@@ -21,4 +21,6 @@ Formats or import paths with unresolved provenance should remain outside this mo
 
 The module depends on JUCE and `osci_render_core`. A proprietary product still needs suitable JUCE commercial or non-GPL rights.
 
+`OSCI_FILE_IMPORT_ENABLE_FORMATTED_TEXT` controls formatted text import support. It defaults to `OSCI_PREMIUM` for current osci-render products, but reusable consumers can set it directly.
+
 Any future third-party parser dependency must be recorded in a module notice file and reviewed before it is enabled in proprietary-compatible builds.

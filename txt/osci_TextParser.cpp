@@ -14,7 +14,7 @@ void TextParser::parse(juce::String text) {
     
     juce::Path textPath;
 
-#if OSCI_PREMIUM
+#if OSCI_FILE_IMPORT_ENABLE_FORMATTED_TEXT
     // Apply formatting markers if the font is bold or italic
     juce::String formattedText = text;
     
@@ -71,7 +71,7 @@ void TextParser::parse(juce::String text) {
         juce::GlyphArrangement glyphs;
         glyphs.addFittedText(currentFont, text, -2, -2, 4, 4, juce::Justification::centred, 2);
         glyphs.createPath(textPath);
-#if OSCI_PREMIUM
+#if OSCI_FILE_IMPORT_ENABLE_FORMATTED_TEXT
     }
 #endif
 
