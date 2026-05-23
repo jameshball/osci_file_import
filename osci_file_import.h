@@ -21,12 +21,12 @@
   vendor:            jameshball
   version:           1.0.0
   name:              osci file import
-  description:       Shared SVG, text, GPLA, and frame import helpers for osci apps
+  description:       Shared file and frame import helpers for osci apps
   website:           https://osci-render.com
   license:           GPLv3
   minimumCppStandard: 20
 
-  dependencies:      juce_core, juce_graphics, juce_gui_basics, osci_render_core
+  dependencies:      juce_core, juce_graphics, juce_gui_basics, juce_audio_basics, juce_audio_formats, osci_render_core
 
  END_JUCE_MODULE_DECLARATION
 
@@ -35,6 +35,8 @@
 #include <juce_core/juce_core.h>
 #include <juce_graphics/juce_graphics.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_audio_basics/juce_audio_basics.h>
+#include <juce_audio_formats/juce_audio_formats.h>
 #include <osci_render_core/osci_render_core.h>
 
 #include "osci_FrameConsumer.h"
@@ -43,3 +45,4 @@
 #include "svg/osci_SvgParser.h"
 #include "txt/osci_TextParser.h"
 #include "gpla/osci_LineArtParser.h"
+#include "wav/osci_WavParser.h"

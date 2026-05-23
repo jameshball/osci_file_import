@@ -1,6 +1,6 @@
 # Proprietary-Compatible Builds
 
-`osci_file_import` contains reusable parser contracts and leaf importers that can be used without the osci-render product orchestration layer.
+`osci_file_import` contains reusable parser contracts and leaf importers that can be used without the osci-render product orchestration layer, including JUCE-backed audio file import helpers.
 
 This is an engineering policy document, not legal advice. The root policy is `../../../docs/proprietary-compatible-builds.md`.
 
@@ -19,7 +19,7 @@ Formats or import paths with unresolved provenance should remain outside this mo
 
 ## Dependencies
 
-The module depends on JUCE and `osci_render_core`. A proprietary product still needs suitable JUCE commercial or non-GPL rights.
+The module depends on JUCE and `osci_render_core`. A proprietary product still needs suitable JUCE commercial or non-GPL rights, plus any notices required for the formats, codecs, or JUCE facilities it enables.
 
 `OSCI_FILE_IMPORT_ENABLE_FORMATTED_TEXT` controls formatted text import support. It defaults to `OSCI_PREMIUM` for current osci-render products, but reusable consumers can set it directly.
 

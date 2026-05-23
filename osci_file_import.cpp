@@ -4,3 +4,4 @@
 #include "svg/osci_SvgParser.cpp"
 #include "txt/osci_TextParser.cpp"
 #include "gpla/osci_LineArtParser.cpp"
+#include "wav/osci_WavParser.cpp"
