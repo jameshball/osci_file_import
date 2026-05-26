@@ -3,7 +3,7 @@
 SvgParser::SvgParser(juce::String svgFile) {
 	auto doc = juce::XmlDocument::parse(svgFile);
     if (doc != nullptr) {
-        std::unique_ptr<juce::Drawable> svg = juce::Drawable::createFromSVG(*doc);
+        std::unique_ptr<juce::Drawable> svg = juce::Drawable::createFromSVGString (doc->toString());
         juce::DrawableComposite* composite = dynamic_cast<juce::DrawableComposite*>(svg.get());
         if (composite != nullptr) {
             auto contentArea = composite->getContentArea();
