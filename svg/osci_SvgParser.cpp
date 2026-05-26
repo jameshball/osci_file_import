@@ -1,9 +1,8 @@
 #include "osci_SvgParser.h"
 
 SvgParser::SvgParser(juce::String svgFile) {
-	auto doc = juce::XmlDocument::parse(svgFile);
-    if (doc != nullptr) {
-        std::unique_ptr<juce::Drawable> svg = juce::Drawable::createFromSVGString (doc->toString());
+    if (svgFile.isNotEmpty()) {
+        std::unique_ptr<juce::Drawable> svg = juce::Drawable::createFromImageData (svgFile.toRawUTF8(), svgFile.getNumBytesAsUTF8());
         juce::DrawableComposite* composite = dynamic_cast<juce::DrawableComposite*>(svg.get());
         if (composite != nullptr) {
             auto contentArea = composite->getContentArea();
