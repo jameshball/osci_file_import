@@ -46,3 +46,6 @@
 #include "txt/osci_TextParser.h"
 #include "gpla/osci_LineArtParser.h"
 #include "wav/osci_WavParser.h"
+#include "fractal/osci_FractalParser.h"
+#include "obj/osci_WorldObject.h"
+#include "obj/osci_ObjectServer.h"

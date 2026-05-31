@@ -1,0 +1,6 @@
+[submodule "third_party/tinyobjloader"]
+	path = third_party/tinyobjloader
+	url = https://github.com/jameshball/tinyobjloader
+[submodule "third_party/chinese_postman"]
+	path = third_party/chinese_postman
+	url = git@github.com:jameshball/chinese-postman.git
