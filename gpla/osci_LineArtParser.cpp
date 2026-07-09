@@ -8,11 +8,15 @@ LineArtParser::LineArtParser(juce::String json) {
     numFrames = frames.size();
 }
 
-LineArtParser::LineArtParser(char* data, int dataLength) {
+LineArtParser::LineArtParser(const char* data, int dataLength) {
     frames.clear();
     numFrames = 0;
-    frames = parseBinaryFrames(data, dataLength);
+    int parsedFrameRate = 0;
+    frames = parseBinaryFrames(data, dataLength, parsedFrameRate);
     numFrames = frames.size();
+    if (parsedFrameRate > 0) {
+        frameRate = (double)parsedFrameRate;
+    }
     if (numFrames == 0) {
         frames = epicFail();
         numFrames = frames.size();
@@ -44,8 +48,13 @@ std::vector<std::vector<osci::Line>> LineArtParser::fallbackFrames() {
     }};
 }
 
-std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(char* bytes, int bytesLength) {
-    int64_t* data = (int64_t*)bytes;
+std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(const char* bytes, int bytesLength) {
+    int ignoredFrameRate = 0;
+    return parseBinaryFrames(bytes, bytesLength, ignoredFrameRate);
+}
+
+std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(const char* bytes, int bytesLength, int& outFrameRate) {
+    const int64_t* data = reinterpret_cast<const int64_t*>(bytes);
     int dataLength = bytesLength / 8;
     std::vector<std::vector<osci::Line>> tFrames;
 
@@ -96,6 +105,7 @@ std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(char* byte
             reportedNumFrames = rawData;
         } else if (strcmp(tag, "fRate   ") == 0) {
             frameRate = rawData;
+            outFrameRate = frameRate;
         }
 
         if (index >= dataLength) return epicFail();
