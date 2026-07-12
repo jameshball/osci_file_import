@@ -16,7 +16,6 @@ public:
 	double getFrameRate() const { return frameRate; }
 
 	static std::vector<std::vector<osci::Line>> parseJsonFrames(juce::String jsonStr);
-	static std::vector<std::vector<osci::Line>> parseBinaryFrames(const char* data, int dataLength);
 	static std::vector<std::vector<osci::Line>> parseBinaryFrames(const char* data, int dataLength, int& outFrameRate);
 
 	static std::vector<osci::Line> generateFrame(juce::Array < juce::var> objects, double focalLength);

@@ -48,11 +48,6 @@ std::vector<std::vector<osci::Line>> LineArtParser::fallbackFrames() {
     }};
 }
 
-std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(const char* bytes, int bytesLength) {
-    int ignoredFrameRate = 0;
-    return parseBinaryFrames(bytes, bytesLength, ignoredFrameRate);
-}
-
 std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(const char* bytes, int bytesLength, int& outFrameRate) {
     const int64_t* data = reinterpret_cast<const int64_t*>(bytes);
     int dataLength = bytesLength / 8;

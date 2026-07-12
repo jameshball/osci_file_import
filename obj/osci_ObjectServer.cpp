@@ -110,7 +110,8 @@ void ObjectServer::run() {
                                     int bytesRead = binStream.getDataSize();
                                     if (bytesRead < 8) return;
                                     const char* gplaData = static_cast<const char*>(binStream.getData());
-                                    receivedFrames = LineArtParser::parseBinaryFrames(gplaData, bytesRead);
+                                    int ignoredFrameRate = 0;
+                                    receivedFrames = LineArtParser::parseBinaryFrames(gplaData, bytesRead, ignoredFrameRate);
                                     if (receivedFrames.size() <= 0) continue;
                                     frameContainer = receivedFrames[0];
                                 }
