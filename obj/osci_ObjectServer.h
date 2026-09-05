@@ -24,6 +24,7 @@ public:
     void reload();
 
 private:
+    bool processMessage(const char* data, int size);
     int getPort();
     void setRendering(bool enabled);
     void addFrame(std::vector<std::unique_ptr<osci::Shape>>& frame, bool force);
@@ -31,6 +32,5 @@ private:
     juce::SpinLock callbacksLock;
     Callbacks callbacks;
 
-    int port = 51677;
     juce::StreamingSocket socket;
 };

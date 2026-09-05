@@ -1,7 +1,5 @@
 #include "osci_ObjectServer.h"
 
-#include <cstring>
-
 ObjectServer::ObjectServer() : juce::Thread("Object Server") {}
 
 ObjectServer::ObjectServer(Callbacks callbacks) : ObjectServer() {
@@ -10,7 +8,7 @@ ObjectServer::ObjectServer(Callbacks callbacks) : ObjectServer() {
 
 ObjectServer::~ObjectServer() {
     socket.close();
-    stopThread(1000);
+    stopThread(-1);
 }
 
 void ObjectServer::setCallbacks(Callbacks newCallbacks) {
@@ -23,7 +21,8 @@ void ObjectServer::setCallbacks(Callbacks newCallbacks) {
 
 void ObjectServer::reload() {
     socket.close();
-    stopThread(1000);
+    stopThread(-1);
+    setRendering(false);
     startThread();
 }
 
@@ -58,113 +57,110 @@ void ObjectServer::addFrame(std::vector<std::unique_ptr<osci::Shape>>& frame, bo
     }
 }
 
-void ObjectServer::run() {
-    port = getPort();
-    if (socket.createListener(port, "127.0.0.1")) {
-        // preallocating a large buffer to avoid allocations in the loop
-        std::unique_ptr<char[]> message{ new char[10 * 1024 * 1024] };
+bool ObjectServer::processMessage(const char* data, int size) {
+    const auto message = juce::String::fromUTF8(data, size).trimEnd();
+    if (message == "CLOSE") {
+        return false;
+    }
+    if (message.isEmpty()) {
+        return true;
+    }
 
-        while (!threadShouldExit()) {
-            if (socket.waitUntilReady(true, 200)) {
-                std::unique_ptr<juce::StreamingSocket> connection(socket.waitForNextConnection());
-
-                if (connection != nullptr) {
-                    setRendering(true);
-
-                    while (!threadShouldExit() && connection->isConnected()) {
-                        if (connection->waitUntilReady(true, 200) == 1) {
-                            int i = 0;
-                            std::vector<osci::Line> frameContainer;
-
-                            // read until we get a newline
-                            while (!threadShouldExit()) {
-                                char buffer[1024];
-                                int bytesRead = connection->read(buffer, sizeof(buffer), false);
-
-                                if (bytesRead <= 0) {
-                                    break;
-                                }
-
-                                std::memcpy(message.get() + i, buffer, bytesRead);
-                                i += bytesRead;
-
-                                for (int j = i - bytesRead; j < i; j++) {
-                                    if (message[j] == '\n') {
-                                        message[j] = '\0';
-                                        break;
-                                    }
-                                }
-                            }
-
-                            if (strncmp(message.get(), "CLOSE", 5) == 0) {
-                                connection->close();
-                                setRendering(false);
-                                break;
-                            }
-
-                            if (strncmp(message.get(), "R1BMQSAg", 8) == 0) {
-                                juce::MemoryOutputStream binStream;
-                                juce::String messageString = message.get();
-                                if (juce::Base64::convertFromBase64(binStream, messageString)) {
-                                    std::vector<std::vector<osci::Line>> receivedFrames;
-                                    int bytesRead = binStream.getDataSize();
-                                    if (bytesRead < 8) return;
-                                    const char* gplaData = static_cast<const char*>(binStream.getData());
-                                    int ignoredFrameRate = 0;
-                                    receivedFrames = LineArtParser::parseBinaryFrames(gplaData, bytesRead, ignoredFrameRate);
-                                    if (receivedFrames.size() <= 0) continue;
-                                    frameContainer = receivedFrames[0];
-                                }
-                                else {
-                                    continue;
-                                }
-                            }
-                            else {
-
-                                // format of json is:
-                                // {
-                                //   "objects": [
-                                //     {
-                                //       "name": "Line Art",
-                                //       "vertices": [
-                                //         [
-                                //           {
-                                //             "x": double value,
-                                //             "y": double value,
-                                //             "z": double value
-                                //           },
-                                //           ...
-                                //         ],
-                                //         ...
-                                //       ],
-                                //       "matrix": [
-                                //         16 double values
-                                //       ]
-                                //     }
-                                //   ],
-                                //   "focalLength": double value
-                                // }
-
-                                auto json = juce::JSON::parse(message.get());
-
-                                juce::Array<juce::var> objects = *json.getProperty("objects", juce::Array<juce::var>()).getArray();
-                                double focalLength = json.getProperty("focalLength", 1);
-
-                                frameContainer = LineArtParser::generateFrame(objects, focalLength);
-                            }
-
-                            std::vector<std::unique_ptr<osci::Shape>> frame;
-
-                            for (int i = 0; i < frameContainer.size(); i++) {
-                                osci::Line l = frameContainer[i];
-                                frame.push_back(std::make_unique<osci::Line>(l.x1, l.y1, l.x2, l.y2));
-                            }
-
-                            addFrame(frame, false);
-                        }
-                    }
+    std::vector<osci::Line> lines;
+    if (message.startsWith("R1BMQSAg")) {
+        juce::MemoryOutputStream binary;
+        if (!juce::Base64::convertFromBase64(binary, message) || binary.getDataSize() < 8) {
+            return true;
+        }
+        int ignoredFrameRate = 0;
+        auto frames = LineArtParser::parseBinaryFrames(static_cast<const char*>(binary.getData()),
+                                                      static_cast<int>(binary.getDataSize()), ignoredFrameRate);
+        if (frames.empty()) {
+            return true;
+        }
+        lines = std::move(frames.front());
+    } else {
+        const auto json = juce::JSON::parse(message);
+        const auto objects = json.getProperty("objects", juce::var());
+        if (!objects.isArray()) {
+            return true;
+        }
+        // The shared geometry parser expects arrays and a complete transform matrix.
+        for (const auto& object : *objects.getArray()) {
+            const auto vertices = object.getProperty("vertices", juce::var());
+            const auto matrix = object.getProperty("matrix", juce::var());
+            if (!vertices.isArray() || !matrix.isArray() || matrix.size() != 16) {
+                return true;
+            }
+            for (const auto& stroke : *vertices.getArray()) {
+                if (!stroke.isArray() || stroke.size() == 0) {
+                    return true;
                 }
             }
+        }
+        lines = LineArtParser::generateFrame(*objects.getArray(), json.getProperty("focalLength", 1));
+    }
+    std::vector<std::unique_ptr<osci::Shape>> frame;
+    frame.reserve(lines.size());
+    for (const auto& line : lines) {
+        frame.push_back(std::make_unique<osci::Line>(line.x1, line.y1, line.x2, line.y2));
+    }
+    addFrame(frame, false);
+    return true;
+}
+
+void ObjectServer::run() {
+    if (!socket.createListener(getPort(), "127.0.0.1")) {
+        return;
+    }
+    constexpr int maxMessageBytes = 10 * 1024 * 1024;
+    std::unique_ptr<char[]> message { new char[maxMessageBytes] };
+    while (!threadShouldExit()) {
+        const int ready = socket.waitUntilReady(true, 200);
+        if (ready < 0) {
+            break;
+        }
+        if (ready == 0) {
+            continue;
+        }
+        std::unique_ptr<juce::StreamingSocket> connection(socket.waitForNextConnection());
+        if (connection == nullptr || threadShouldExit()) {
+            continue;
+        }
+        setRendering(true);
+        int messageSize = 0;
+        while (!threadShouldExit() && connection->isConnected()) {
+            const int readable = connection->waitUntilReady(true, 200);
+            if (readable < 0) {
+                break;
+            }
+            if (readable == 0) {
+                continue;
+            }
+            char buffer[4096];
+            const int bytesRead = connection->read(buffer, sizeof(buffer), false);
+            if (bytesRead <= 0) {
+                break;
+            }
+            for (int i = 0; i < bytesRead && !threadShouldExit(); ++i) {
+                if (buffer[i] == '\n') {
+                    if (!processMessage(message.get(), messageSize)) {
+                        connection->close();
+                        break;
+                    }
+                    messageSize = 0;
+                } else if (messageSize == maxMessageBytes || buffer[i] == '\0') {
+                    connection->close();
+                    break;
+                } else {
+                    message[messageSize++] = buffer[i];
+                }
+            }
+        }
+        connection->close();
+        // reload clears the source after joining; destruction must not issue callbacks.
+        if (!threadShouldExit()) {
+            setRendering(false);
         }
     }
 }
