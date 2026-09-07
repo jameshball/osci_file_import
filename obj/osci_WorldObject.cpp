@@ -5,6 +5,7 @@
 #include "../third_party/tinyobjloader/tiny_obj_loader.h"
 
 #include <unordered_set>
+#include <algorithm>
 
 namespace {
 
@@ -21,7 +22,7 @@ struct pair_hash {
 std::vector<std::vector<int>> ConnectedComponents(Graph& G) {
     std::vector<std::vector<int>> components;
     std::vector<bool> visited(G.GetNumVertices(), false);
-    std::list<int> L;
+    std::vector<int> L;
 
     for (int i = 0; i < visited.size(); i++) {
         // if condition should only be true for the first element in
@@ -100,7 +101,7 @@ WorldObject::WorldObject(const std::string& obj_string) {
     //
     // getting edges from obj file
     // 
-    std::vector<tinyobj::shape_t> shapes = reader.GetShapes();
+    const auto& shapes = reader.GetShapes();
     std::unordered_set<std::pair<int, int>, pair_hash> edge_set;
 
 	for (auto& shape : shapes) {
@@ -166,8 +167,12 @@ WorldObject::WorldObject(const std::string& obj_string) {
 
     // perform chinese postman on all connected sub-components of graph
     // TODO: move this to separate graph-related file
-    for (auto& connected_component : connected_components) {
-        // TODO: make this parallel: https://stackoverflow.com/questions/36246300/parallel-loops-in-c
+    std::vector<int> obj_to_graph_vertex(numVertices);
+    std::vector<std::vector<osci::Line>> componentEdges(connected_components.size());
+    // Include the caller in the budget and avoid excessive threads on large workstations.
+    ParallelWork work(std::min(16, juce::SystemStats::getNumPhysicalCpus()));
+    auto calculate = [&](size_t index) {
+        auto& connected_component = connected_components[index];
 		// TODO: check the number of edges in the subgraph to make sure it's not too large compared to java version
 
         //
@@ -177,51 +182,45 @@ WorldObject::WorldObject(const std::string& obj_string) {
 		// we also need a mapping back to the obj vertices so that
         // we can construct the path at the end
         //
-        std::vector<bool> present_vertices(graph.GetNumVertices(), false);
-
-        for (int vertex : connected_component) {
-            present_vertices[vertex] = true;
-        }
-
-        std::unordered_map<int, int> obj_to_graph_vertex;
-        std::unordered_map<int, int> graph_to_obj_vertex;
-
-        int count = 0;
-        for (int i = 0; i < graph.GetNumVertices(); i++) {
-            if (present_vertices[i]) {
-                obj_to_graph_vertex[i] = i - count;
-                graph_to_obj_vertex[i - count] = i;
-            } else {
-                count++;
-            }
+        auto graph_to_obj_vertex = connected_component;
+        std::sort(graph_to_obj_vertex.begin(), graph_to_obj_vertex.end());
+        for (int i = 0; i < graph_to_obj_vertex.size(); ++i) {
+            obj_to_graph_vertex[graph_to_obj_vertex[i]] = i;
         }
 
         // generate all edges in sub-component using the vertex
         // maps and parent Graph's adjacency list
-        std::list<std::pair<int, int>> sub_edge_list;
+        Graph subgraph;
+        if (connected_components.size() == 1) {
+            graph.OrderAdjacency(connected_component);
+            subgraph = std::move(graph);
+        } else {
+            std::list<std::pair<int, int>> sub_edge_list;
 
-        for (int obj_start : connected_component) {
-            for (int obj_end : graph.AdjList(obj_start)) {
-                int graph_start = obj_to_graph_vertex[obj_start];
-                int graph_end = obj_to_graph_vertex[obj_end];
-                sub_edge_list.push_back(std::make_pair(graph_start, graph_end));
+            for (int obj_start : connected_component) {
+                for (int obj_end : graph.AdjList(obj_start)) {
+                    int graph_start = obj_to_graph_vertex[obj_start];
+                    int graph_end = obj_to_graph_vertex[obj_end];
+                    sub_edge_list.push_back(std::make_pair(graph_start, graph_end));
+                }
             }
+
+            subgraph = Graph(connected_component.size(), sub_edge_list);
         }
 
-        Graph subgraph(connected_component.size(), sub_edge_list);
-
         std::vector<double> cost(subgraph.GetNumEdges());
-		for (auto& edge : sub_edge_list) {
+		for (int edgeIndex = 0; edgeIndex < subgraph.GetNumEdges(); ++edgeIndex) {
+            const auto edge = subgraph.GetEdge(edgeIndex);
             int obj_start = graph_to_obj_vertex[edge.first];
             int obj_end = graph_to_obj_vertex[edge.second];
 			double deltax = vs[3 * obj_start] - vs[3 * obj_end];
 			double deltay = vs[3 * obj_start + 1] - vs[3 * obj_end + 1];
 			double deltaz = vs[3 * obj_start + 2] - vs[3 * obj_end + 2];
 			double c = std::sqrt(deltax * deltax + deltay * deltay + deltaz * deltaz);
-            cost[subgraph.GetEdgeIndex(edge.first, edge.second)] = c;
+            cost[edgeIndex] = c;
 		}
 
-        pair<list<int>, double> solution = ChinesePostman(subgraph, cost);
+        pair<list<int>, double> solution = ChinesePostman(subgraph, cost, work);
         list<int>& path = solution.first;
 
         // traverse CP solution, converting back to obj vertices
@@ -236,10 +235,19 @@ WorldObject::WorldObject(const std::string& obj_string) {
                 double y2 = vs[vertex * 3 + 1];
                 double z2 = vs[vertex * 3 + 2];
 
-                edges.push_back(osci::Line(x1, y1, z1, x2, y2, z2));
+                componentEdges[index].push_back(osci::Line(x1, y1, z1, x2, y2, z2));
             }
             prevVertex = vertex;
         }
+    };
+    // Tiny components cost less to solve than to dispatch to worker threads.
+    const bool parallelComponents = numVertices >= 1000 && std::any_of(connected_components.begin(), connected_components.end(), [](const auto& component) { return component.size() >= 128; });
+    work.forEach(connected_components.size(), calculate, parallelComponents);
+    size_t count = 0;
+    for (auto& result : componentEdges) { count += result.size(); }
+    edges.reserve(count);
+    for (auto& result : componentEdges) {
+        edges.insert(edges.end(), std::make_move_iterator(result.begin()), std::make_move_iterator(result.end()));
     }
 }
 
