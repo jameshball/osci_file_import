@@ -22,10 +22,9 @@ osci::Point FractalPath::nextVector(float drawingProgress) {
     const int numDraws = (int)segments->size();
     if (numDraws == 0) return osci::Point();
 
-    float segFloat = drawingProgress * numDraws;
-    int idx = (int)segFloat;
-    float t = segFloat - idx;
-    idx = juce::jlimit(0, numDraws - 1, idx);
+    const float scaledProgress = juce::jlimit(0.0f, 1.0f, drawingProgress) * (float)numDraws;
+    const int idx = juce::jmin((int)scaledProgress, numDraws - 1);
+    const float t = scaledProgress >= (float)numDraws ? 1.0f : scaledProgress - (float)idx;
 
     const auto& seg = (*segments)[idx];
     return osci::Point(seg.x + t * seg.dx, seg.y + t * seg.dy, 0.0f);
