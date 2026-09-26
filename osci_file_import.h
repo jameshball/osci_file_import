@@ -49,3 +49,5 @@
 #include "fractal/osci_FractalParser.h"
 #include "obj/osci_WorldObject.h"
 #include "obj/osci_ObjectServer.h"
+
+#include "img/osci_RasterDecoder.h"
