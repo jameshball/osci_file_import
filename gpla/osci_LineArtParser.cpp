@@ -116,138 +116,9 @@ std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(const char
     
     while (strcmp(tag, "END GPLA") != 0) {
         if (strcmp(tag, "FRAME   ") == 0) {
-            if (index >= dataLength) return epicFail();
-            rawData = data[index];
-            index++;
-            makeChars(rawData, tag);
-
-            double focalLength;
-            std::vector<std::vector<double>> allMatrices;
-            std::vector<std::vector<std::vector<osci::Point>>> allVertices;
-            while (strcmp(tag, "OBJECTS ") != 0) {
-                if (index >= dataLength) return epicFail();
-                rawData = data[index];
-                index++;
-
-                if (strcmp(tag, "focalLen") == 0) {
-                    focalLength = makeDouble(rawData);
-                }
-
-                if (index >= dataLength) return epicFail();
-                rawData = data[index];
-                index++;
-                makeChars(rawData, tag);
-            }
-
-            if (index >= dataLength) return epicFail();
-            rawData = data[index];
-            index++;
-            makeChars(rawData, tag);
-            
-            while (strcmp(tag, "DONE    ") != 0) {
-                if (strcmp(tag, "OBJECT  ") == 0) {
-                    std::vector<std::vector<osci::Point>> vertices;
-                    std::vector<double> matrix;
-                    if (index >= dataLength) return epicFail();
-                    int strokeNum = 0;
-                    rawData = data[index];
-                    index++;
-                    makeChars(rawData, tag);
-                    while (strcmp(tag, "DONE    ") != 0) {
-                        if (strcmp(tag, "MATRIX  ") == 0) {
-                            matrix.clear();
-                            for (int i = 0; i < 16; i++) {
-                                if (index >= dataLength) return epicFail();
-                                rawData = data[index];
-                                index++;
-                                matrix.push_back(makeDouble(rawData));
-                            }
-                            if (index >= dataLength) return epicFail();
-                            rawData = data[index];
-                            index++;
-                        } else if (strcmp(tag, "STROKES ") == 0) {
-                            if (index >= dataLength) return epicFail();
-                            rawData = data[index];
-                            index++;
-                            makeChars(rawData, tag);
-
-                            while (strcmp(tag, "DONE    ") != 0) {
-                                if (strcmp(tag, "STROKE  ") == 0) {
-                                    vertices.push_back(std::vector<osci::Point>());
-                                    if (index >= dataLength) return epicFail();
-                                    rawData = data[index];
-                                    index++;
-                                    makeChars(rawData, tag);
-
-                                    int vertexCount = 0;
-                                    while (strcmp(tag, "DONE    ") != 0) {
-                                        if (strcmp(tag, "vertexCt") == 0) {
-                                            if (index >= dataLength) return epicFail();
-                                            rawData = data[index];
-                                            index++;
-                                            vertexCount = rawData;
-                                        }
-                                        else if (strcmp(tag, "VERTICES") == 0) {
-                                            double x = 0;
-                                            double y = 0;
-                                            double z = 0;
-                                            for (int i = 0; i < vertexCount; i++) {
-                                                if (index + 2 >= dataLength) return epicFail();
-                                                rawData = data[index];
-                                                index++;
-                                                x = makeDouble(rawData);
-
-                                                rawData = data[index];
-                                                index++;
-                                                y = makeDouble(rawData);
-
-                                                rawData = data[index];
-                                                index++;
-                                                z = makeDouble(rawData);
-
-                                                vertices[strokeNum].push_back(osci::Point(x, y, z));
-                                            }
-                                            if (index >= dataLength) return epicFail();
-                                            rawData = data[index];
-                                            index++;
-                                            makeChars(rawData, tag);
-                                            while (strcmp(tag, "DONE    ") != 0) {
-                                                if (index >= dataLength) return epicFail();
-                                                rawData = data[index];
-                                                index++;
-                                                makeChars(rawData, tag);
-                                            }
-                                        }
-                                        if (index >= dataLength) return epicFail();
-                                        rawData = data[index];
-                                        index++;
-                                        makeChars(rawData, tag);
-                                    }
-                                    strokeNum++;
-                                }
-                                if (index >= dataLength) return epicFail();
-                                rawData = data[index];
-                                index++;
-                                makeChars(rawData, tag);
-                            }
-                        }
-                        if (index >= dataLength) return epicFail();
-                        rawData = data[index];
-                        index++;
-                        makeChars(rawData, tag);
-                    }
-                    allVertices.push_back(reorderVertices(vertices));
-                    allMatrices.push_back(matrix);
-                    vertices.clear();
-                    matrix.clear();
-                }
-                if (index >= dataLength) return epicFail();
-                rawData = data[index];
-                index++;
-                makeChars(rawData, tag);
-            }
-            std::vector<osci::Line> frame = assembleFrame(allVertices, allMatrices, focalLength);
-            tFrames.push_back(frame);
+            auto frame = parseFrameBody(data, dataLength, index);
+            if (!frame.has_value()) return epicFail();
+            tFrames.push_back(std::move(*frame));
         }
         if (index >= dataLength) return epicFail();
         rawData = data[index];
@@ -255,6 +126,157 @@ std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(const char
         makeChars(rawData, tag);
     }
     return tFrames;
+}
+
+std::optional<std::vector<osci::Line>> LineArtParser::parseFrameBody(const int64_t* data, int dataLength, int& index) {
+    int64_t rawData = 0;
+    char tag[9] = "        ";
+    if (index >= dataLength) return std::nullopt;
+    rawData = data[index];
+    index++;
+    makeChars(rawData, tag);
+
+    double focalLength;
+    std::vector<std::vector<double>> allMatrices;
+    std::vector<std::vector<std::vector<osci::Point>>> allVertices;
+    while (strcmp(tag, "OBJECTS ") != 0) {
+        if (index >= dataLength) return std::nullopt;
+        rawData = data[index];
+        index++;
+
+        if (strcmp(tag, "focalLen") == 0) {
+            focalLength = makeDouble(rawData);
+        }
+
+        if (index >= dataLength) return std::nullopt;
+        rawData = data[index];
+        index++;
+        makeChars(rawData, tag);
+    }
+
+    if (index >= dataLength) return std::nullopt;
+    rawData = data[index];
+    index++;
+    makeChars(rawData, tag);
+            
+    while (strcmp(tag, "DONE    ") != 0) {
+        if (strcmp(tag, "OBJECT  ") == 0) {
+            std::vector<std::vector<osci::Point>> vertices;
+            std::vector<double> matrix;
+            if (index >= dataLength) return std::nullopt;
+            int strokeNum = 0;
+            rawData = data[index];
+            index++;
+            makeChars(rawData, tag);
+            while (strcmp(tag, "DONE    ") != 0) {
+                if (strcmp(tag, "MATRIX  ") == 0) {
+                    matrix.clear();
+                    for (int i = 0; i < 16; i++) {
+                        if (index >= dataLength) return std::nullopt;
+                        rawData = data[index];
+                        index++;
+                        matrix.push_back(makeDouble(rawData));
+                    }
+                    if (index >= dataLength) return std::nullopt;
+                    rawData = data[index];
+                    index++;
+                } else if (strcmp(tag, "STROKES ") == 0) {
+                    if (index >= dataLength) return std::nullopt;
+                    rawData = data[index];
+                    index++;
+                    makeChars(rawData, tag);
+
+                    while (strcmp(tag, "DONE    ") != 0) {
+                        if (strcmp(tag, "STROKE  ") == 0) {
+                            vertices.push_back(std::vector<osci::Point>());
+                            if (index >= dataLength) return std::nullopt;
+                            rawData = data[index];
+                            index++;
+                            makeChars(rawData, tag);
+
+                            int vertexCount = 0;
+                            while (strcmp(tag, "DONE    ") != 0) {
+                                if (strcmp(tag, "vertexCt") == 0) {
+                                    if (index >= dataLength) return std::nullopt;
+                                    rawData = data[index];
+                                    index++;
+                                    vertexCount = rawData;
+                                }
+                                else if (strcmp(tag, "VERTICES") == 0) {
+                                    double x = 0;
+                                    double y = 0;
+                                    double z = 0;
+                                    for (int i = 0; i < vertexCount; i++) {
+                                        if (index + 2 >= dataLength) return std::nullopt;
+                                        rawData = data[index];
+                                        index++;
+                                        x = makeDouble(rawData);
+
+                                        rawData = data[index];
+                                        index++;
+                                        y = makeDouble(rawData);
+
+                                        rawData = data[index];
+                                        index++;
+                                        z = makeDouble(rawData);
+
+                                        vertices[strokeNum].push_back(osci::Point(x, y, z));
+                                    }
+                                    if (index >= dataLength) return std::nullopt;
+                                    rawData = data[index];
+                                    index++;
+                                    makeChars(rawData, tag);
+                                    while (strcmp(tag, "DONE    ") != 0) {
+                                        if (index >= dataLength) return std::nullopt;
+                                        rawData = data[index];
+                                        index++;
+                                        makeChars(rawData, tag);
+                                    }
+                                }
+                                if (index >= dataLength) return std::nullopt;
+                                rawData = data[index];
+                                index++;
+                                makeChars(rawData, tag);
+                            }
+                            strokeNum++;
+                        }
+                        if (index >= dataLength) return std::nullopt;
+                        rawData = data[index];
+                        index++;
+                        makeChars(rawData, tag);
+                    }
+                }
+                if (index >= dataLength) return std::nullopt;
+                rawData = data[index];
+                index++;
+                makeChars(rawData, tag);
+            }
+            allVertices.push_back(reorderVertices(vertices));
+            allMatrices.push_back(matrix);
+            vertices.clear();
+            matrix.clear();
+        }
+        if (index >= dataLength) return std::nullopt;
+        rawData = data[index];
+        index++;
+        makeChars(rawData, tag);
+    }
+    return assembleFrame(allVertices, allMatrices, focalLength);
+}
+
+std::vector<osci::Line> LineArtParser::parseBinaryFrame(const char* bytes, int bytesLength) {
+    const int64_t* data = reinterpret_cast<const int64_t*>(bytes);
+    const int dataLength = bytesLength / 8;
+    char tag[9] = "        ";
+    if (dataLength < 1) {
+        return {};
+    }
+    makeChars(data[0], tag);
+    if (strcmp(tag, "FRAME   ") != 0) {
+        return {};
+    }
+    int index = 1;
+    return parseFrameBody(data, dataLength, index).value_or(std::vector<osci::Line>());
 }
 
 std::vector<std::vector<osci::Line>> LineArtParser::parseJsonFrames(juce::String jsonStr) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include <optional>
 #include <osci_render_core/osci_render_core.h>
 
 #include "../svg/osci_SvgParser.h"
@@ -17,6 +18,8 @@ public:
 
 	static std::vector<std::vector<osci::Line>> parseJsonFrames(juce::String jsonStr);
 	static std::vector<std::vector<osci::Line>> parseBinaryFrames(const char* data, int dataLength, int& outFrameRate);
+	// One frame of a binary file, from its "FRAME   " tag; empty if malformed.
+	static std::vector<osci::Line> parseBinaryFrame(const char* data, int dataLength);
 
 	static std::vector<osci::Line> generateFrame(juce::Array < juce::var> objects, double focalLength);
 
@@ -26,6 +29,7 @@ private:
 	double frameRate = 30.0;
 	static std::vector<std::vector<osci::Line>> epicFail();
 	static std::vector<std::vector<osci::Line>> fallbackFrames();
+	static std::optional<std::vector<osci::Line>> parseFrameBody(const int64_t* data, int dataLength, int& index);
 	static double makeDouble(int64_t data);
 	static void makeChars(int64_t data, char* chars);
 	static std::vector<std::vector<osci::Point>> reorderVertices(std::vector<std::vector<osci::Point>> vertices);
