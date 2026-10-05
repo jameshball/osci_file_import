@@ -117,10 +117,10 @@ std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(const char
     while (strcmp(tag, "END GPLA") != 0) {
         if (strcmp(tag, "FRAME   ") == 0) {
             auto frame = parseFrameBody(data, dataLength, index);
-            if (!frame.has_value()) return epicFail();
+            if (!frame.has_value()) { return epicFail(); }
             tFrames.push_back(std::move(*frame));
         }
-        if (index >= dataLength) return epicFail();
+        if (index >= dataLength) { return epicFail(); }
         rawData = data[index];
         index++;
         makeChars(rawData, tag);
@@ -131,7 +131,7 @@ std::vector<std::vector<osci::Line>> LineArtParser::parseBinaryFrames(const char
 std::optional<std::vector<osci::Line>> LineArtParser::parseFrameBody(const int64_t* data, int dataLength, int& index) {
     int64_t rawData = 0;
     char tag[9] = "        ";
-    if (index >= dataLength) return std::nullopt;
+    if (index >= dataLength) { return std::nullopt; }
     rawData = data[index];
     index++;
     makeChars(rawData, tag);
@@ -140,7 +140,7 @@ std::optional<std::vector<osci::Line>> LineArtParser::parseFrameBody(const int64
     std::vector<std::vector<double>> allMatrices;
     std::vector<std::vector<std::vector<osci::Point>>> allVertices;
     while (strcmp(tag, "OBJECTS ") != 0) {
-        if (index >= dataLength) return std::nullopt;
+        if (index >= dataLength) { return std::nullopt; }
         rawData = data[index];
         index++;
 
@@ -148,22 +148,22 @@ std::optional<std::vector<osci::Line>> LineArtParser::parseFrameBody(const int64
             focalLength = makeDouble(rawData);
         }
 
-        if (index >= dataLength) return std::nullopt;
+        if (index >= dataLength) { return std::nullopt; }
         rawData = data[index];
         index++;
         makeChars(rawData, tag);
     }
 
-    if (index >= dataLength) return std::nullopt;
+    if (index >= dataLength) { return std::nullopt; }
     rawData = data[index];
     index++;
     makeChars(rawData, tag);
-            
+
     while (strcmp(tag, "DONE    ") != 0) {
         if (strcmp(tag, "OBJECT  ") == 0) {
             std::vector<std::vector<osci::Point>> vertices;
             std::vector<double> matrix;
-            if (index >= dataLength) return std::nullopt;
+            if (index >= dataLength) { return std::nullopt; }
             int strokeNum = 0;
             rawData = data[index];
             index++;
@@ -172,16 +172,16 @@ std::optional<std::vector<osci::Line>> LineArtParser::parseFrameBody(const int64
                 if (strcmp(tag, "MATRIX  ") == 0) {
                     matrix.clear();
                     for (int i = 0; i < 16; i++) {
-                        if (index >= dataLength) return std::nullopt;
+                        if (index >= dataLength) { return std::nullopt; }
                         rawData = data[index];
                         index++;
                         matrix.push_back(makeDouble(rawData));
                     }
-                    if (index >= dataLength) return std::nullopt;
+                    if (index >= dataLength) { return std::nullopt; }
                     rawData = data[index];
                     index++;
                 } else if (strcmp(tag, "STROKES ") == 0) {
-                    if (index >= dataLength) return std::nullopt;
+                    if (index >= dataLength) { return std::nullopt; }
                     rawData = data[index];
                     index++;
                     makeChars(rawData, tag);
@@ -189,7 +189,7 @@ std::optional<std::vector<osci::Line>> LineArtParser::parseFrameBody(const int64
                     while (strcmp(tag, "DONE    ") != 0) {
                         if (strcmp(tag, "STROKE  ") == 0) {
                             vertices.push_back(std::vector<osci::Point>());
-                            if (index >= dataLength) return std::nullopt;
+                            if (index >= dataLength) { return std::nullopt; }
                             rawData = data[index];
                             index++;
                             makeChars(rawData, tag);
@@ -197,17 +197,16 @@ std::optional<std::vector<osci::Line>> LineArtParser::parseFrameBody(const int64
                             int vertexCount = 0;
                             while (strcmp(tag, "DONE    ") != 0) {
                                 if (strcmp(tag, "vertexCt") == 0) {
-                                    if (index >= dataLength) return std::nullopt;
+                                    if (index >= dataLength) { return std::nullopt; }
                                     rawData = data[index];
                                     index++;
                                     vertexCount = rawData;
-                                }
-                                else if (strcmp(tag, "VERTICES") == 0) {
+                                } else if (strcmp(tag, "VERTICES") == 0) {
                                     double x = 0;
                                     double y = 0;
                                     double z = 0;
                                     for (int i = 0; i < vertexCount; i++) {
-                                        if (index + 2 >= dataLength) return std::nullopt;
+                                        if (index + 2 >= dataLength) { return std::nullopt; }
                                         rawData = data[index];
                                         index++;
                                         x = makeDouble(rawData);
@@ -222,31 +221,31 @@ std::optional<std::vector<osci::Line>> LineArtParser::parseFrameBody(const int64
 
                                         vertices[strokeNum].push_back(osci::Point(x, y, z));
                                     }
-                                    if (index >= dataLength) return std::nullopt;
+                                    if (index >= dataLength) { return std::nullopt; }
                                     rawData = data[index];
                                     index++;
                                     makeChars(rawData, tag);
                                     while (strcmp(tag, "DONE    ") != 0) {
-                                        if (index >= dataLength) return std::nullopt;
+                                        if (index >= dataLength) { return std::nullopt; }
                                         rawData = data[index];
                                         index++;
                                         makeChars(rawData, tag);
                                     }
                                 }
-                                if (index >= dataLength) return std::nullopt;
+                                if (index >= dataLength) { return std::nullopt; }
                                 rawData = data[index];
                                 index++;
                                 makeChars(rawData, tag);
                             }
                             strokeNum++;
                         }
-                        if (index >= dataLength) return std::nullopt;
+                        if (index >= dataLength) { return std::nullopt; }
                         rawData = data[index];
                         index++;
                         makeChars(rawData, tag);
                     }
                 }
-                if (index >= dataLength) return std::nullopt;
+                if (index >= dataLength) { return std::nullopt; }
                 rawData = data[index];
                 index++;
                 makeChars(rawData, tag);
@@ -256,7 +255,7 @@ std::optional<std::vector<osci::Line>> LineArtParser::parseFrameBody(const int64
             vertices.clear();
             matrix.clear();
         }
-        if (index >= dataLength) return std::nullopt;
+        if (index >= dataLength) { return std::nullopt; }
         rawData = data[index];
         index++;
         makeChars(rawData, tag);
