@@ -88,7 +88,12 @@ static Palette palette(Cursor& input, unsigned count) {
     return result;
 }
 static void skipBlocks(Cursor& input, const std::atomic<bool>* cancel) {
-    for (;;) { checkCancel(cancel); const auto count = input.byte(); if (count == 0) { return; } input.skip(count); }
+    for (;;) {
+        checkCancel(cancel);
+        const auto count = input.byte();
+        if (count == 0) { return; }
+        input.skip(count);
+    }
 }
 struct GifFrame {
     unsigned x = 0, y = 0, width = 0, height = 0, disposal = 0, delay = 0, minimumCode = 0, colours = 0;
@@ -135,8 +140,11 @@ static Gif inspectGif(const Byte* data, std::size_t size, const std::atomic<bool
                 const auto index = input.byte();
                 transparent = (control & 1) != 0 ? index : -1;
                 if (input.byte() != 0) { throw Failure("GIF graphic control block is unterminated."); }
-            } else if (type == 0xfe || type == 0xff) { skipBlocks(input, cancel); }
-            else { throw Failure("GIF contains an unsupported text or extension block."); }
+            } else if (type == 0xfe || type == 0xff) {
+                skipBlocks(input, cancel);
+            } else {
+                throw Failure("GIF contains an unsupported text or extension block.");
+            }
             continue;
         }
         if (marker != 0x2c) { throw Failure("GIF image block marker is invalid."); }
@@ -144,7 +152,10 @@ static Gif inspectGif(const Byte* data, std::size_t size, const std::atomic<bool
             throw Failure("GIF exceeds 10000 frames or 256 MiB of decoded RGBA.");
         }
         GifFrame frame;
-        frame.x = input.word(); frame.y = input.word(); frame.width = input.word(); frame.height = input.word();
+        frame.x = input.word();
+        frame.y = input.word();
+        frame.width = input.word();
+        frame.height = input.word();
         if (frame.width == 0 || frame.height == 0 || frame.x + frame.width > gif.width || frame.y + frame.height > gif.height) { throw Failure("GIF frame rectangle lies outside its canvas."); }
         const auto imageFlags = input.byte();
         if ((imageFlags & 0x18) != 0) { throw Failure("GIF image flags are invalid."); }
@@ -199,8 +210,9 @@ static void drawGifFrame(const Byte* data, const Gif& gif, const GifFrame& frame
         ++emitted;
         if (++column == frame.width) {
             column = 0;
-            if (!frame.interlaced) { ++row; }
-            else {
+            if (!frame.interlaced) {
+                ++row;
+            } else {
                 row += steps[pass];
                 while (row >= frame.height && pass < 3) { row = starts[++pass]; }
             }
@@ -211,18 +223,31 @@ static void drawGifFrame(const Byte* data, const Gif& gif, const GifFrame& frame
         int code = input.code(width);
         if (code < 0) { throw Failure("GIF LZW end code is missing."); }
         if (code == static_cast<int>(end)) { break; }
-        if (code == static_cast<int>(clear)) { available = end + 1; width = frame.minimumCode + 1; previous = -1; continue; }
+        if (code == static_cast<int>(clear)) {
+            available = end + 1;
+            width = frame.minimumCode + 1;
+            previous = -1;
+            continue;
+        }
         if (previous < 0) {
             if (code >= static_cast<int>(clear)) { throw Failure("GIF LZW initial code is invalid."); }
-            emit(static_cast<unsigned>(code)); first = static_cast<unsigned>(code); previous = code; continue;
+            emit(static_cast<unsigned>(code));
+            first = static_cast<unsigned>(code);
+            previous = code;
+            continue;
         }
         const auto original = code;
         unsigned count = 0;
-        if (code == static_cast<int>(available)) { stack[count++] = static_cast<Byte>(first); code = previous; }
-        else if (code > static_cast<int>(available)) { throw Failure("GIF LZW dictionary code is invalid."); }
+        if (code == static_cast<int>(available)) {
+            stack[count++] = static_cast<Byte>(first);
+            code = previous;
+        } else if (code > static_cast<int>(available)) {
+            throw Failure("GIF LZW dictionary code is invalid.");
+        }
         while (code >= static_cast<int>(clear)) {
             if (code <= static_cast<int>(end) || code >= static_cast<int>(available) || count >= stack.size() - 1) { throw Failure("GIF LZW dictionary chain is invalid."); }
-            stack[count++] = suffix[static_cast<unsigned>(code)]; code = static_cast<int>(prefix[static_cast<unsigned>(code)]);
+            stack[count++] = suffix[static_cast<unsigned>(code)];
+            code = static_cast<int>(prefix[static_cast<unsigned>(code)]);
         }
         first = static_cast<unsigned>(code);
         stack[count++] = static_cast<Byte>(first);
@@ -255,8 +280,11 @@ static std::shared_ptr<const osci::RasterImage> decodeGif(const Byte* data, std:
         if (frame.disposal == 3) { previous = canvas; }
         drawGifFrame(data, gif, frame, canvas, cancel);
         result->frames.push_back({ canvas, frame.delay });
-        if (frame.disposal == 2) { fill(canvas, gif.width, frame.x, frame.y, frame.width, frame.height, frame.transparent >= 0 ? Colour {} : gif.background, cancel); }
-        else if (frame.disposal == 3) { canvas = std::move(previous); }
+        if (frame.disposal == 2) {
+            fill(canvas, gif.width, frame.x, frame.y, frame.width, frame.height, frame.transparent >= 0 ? Colour {} : gif.background, cancel);
+        } else if (frame.disposal == 3) {
+            canvas = std::move(previous);
+        }
     }
     checkCancel(cancel);
     return result;
@@ -271,15 +299,22 @@ static const stbi_io_callbacks callbacks {
         auto& input = *static_cast<Input*>(context);
         if (cancelled(input.cancel) || requested <= 0) { return 0; }
         const auto count = std::min(static_cast<std::size_t>(requested), input.size - input.position);
-        std::memcpy(output, input.data + input.position, count); input.position += count;
+        std::memcpy(output, input.data + input.position, count);
+        input.position += count;
         return static_cast<int>(count);
     },
     [](void* context, int count) {
         auto& input = *static_cast<Input*>(context);
-        if (count < 0) { input.position -= std::min(input.position, static_cast<std::size_t>(-static_cast<std::int64_t>(count))); }
-        else { input.position += std::min(input.size - input.position, static_cast<std::size_t>(count)); }
+        if (count < 0) {
+            input.position -= std::min(input.position, static_cast<std::size_t>(-static_cast<std::int64_t>(count)));
+        } else {
+            input.position += std::min(input.size - input.position, static_cast<std::size_t>(count));
+        }
     },
-    [](void* context) { const auto& input = *static_cast<Input*>(context); return static_cast<int>(input.position == input.size || cancelled(input.cancel)); }
+    [](void* context) {
+        const auto& input = *static_cast<Input*>(context);
+        return static_cast<int>(input.position == input.size || cancelled(input.cancel));
+    }
 };
 static unsigned big32(const Byte* data) { return (static_cast<unsigned>(data[0]) << 24) | (static_cast<unsigned>(data[1]) << 16) | (static_cast<unsigned>(data[2]) << 8) | data[3]; }
 static std::uint32_t pngCrc(const Byte* data, std::size_t count, const std::atomic<bool>* cancel) {
@@ -352,11 +387,17 @@ osci::RasterDecoder::Result osci::RasterDecoder::decode(const void* data, std::s
         checkCancel(cancel);
         if (pixels == nullptr) { throw Failure("Raster decoding failed, or decoder scratch memory exceeded 256 MiB."); }
         if (canvasBytes(static_cast<unsigned>(width), static_cast<unsigned>(height)) != count) { throw Failure("Raster dimensions changed while decoding."); }
-        auto result = std::make_shared<RasterImage>(); result->width = static_cast<unsigned>(width); result->height = static_cast<unsigned>(height);
+        auto result = std::make_shared<RasterImage>();
+        result->width = static_cast<unsigned>(width);
+        result->height = static_cast<unsigned>(height);
         result->frames.push_back({ std::vector<Byte>(pixels.get(), pixels.get() + count), 0 });
         checkCancel(cancel);
         return { std::move(result), {} };
-    } catch (const std::bad_alloc&) { return { nullptr, "Not enough memory to decode raster source." }; }
-    catch (const std::exception& error) { return { nullptr, error.what() }; }
-    catch (...) { return { nullptr, "Raster decoding failed." }; }
+    } catch (const std::bad_alloc&) {
+        return { nullptr, "Not enough memory to decode raster source." };
+    } catch (const std::exception& error) {
+        return { nullptr, error.what() };
+    } catch (...) {
+        return { nullptr, "Raster decoding failed." };
+    }
 }
