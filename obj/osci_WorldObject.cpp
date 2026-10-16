@@ -51,7 +51,7 @@ std::vector<std::vector<int>> ConnectedComponents(Graph& G) {
 
 } // namespace
 
-WorldObject::WorldObject(const std::string& obj_string) {
+WorldObject::WorldObject(const std::string& obj_string, bool fit) {
     tinyobj::ObjReaderConfig reader_config;
     reader_config.triangulate = false;
     reader_config.vertex_color = false;
@@ -63,39 +63,42 @@ WorldObject::WorldObject(const std::string& obj_string) {
 	numVertices = vs.size() / 3;
 
     //
-    // normalising object vertices
+    // normalising object vertices: centred and scaled to fit the screen,
+    // unless kept as the file has them
     //
-    double x = 0.0, y = 0.0, z = 0.0;
-    for (int i = 0; i < numVertices; i++) {
-        x += vs[i * 3];
-        y += vs[i * 3 + 1];
-        z += vs[i * 3 + 2];
-    }
-    x /= numVertices;
-    y /= numVertices;
-    z /= numVertices;
+    if (fit) {
+        double x = 0.0, y = 0.0, z = 0.0;
+        for (int i = 0; i < numVertices; i++) {
+            x += vs[i * 3];
+            y += vs[i * 3 + 1];
+            z += vs[i * 3 + 2];
+        }
+        x /= numVertices;
+        y /= numVertices;
+        z /= numVertices;
 
-    float max = 0.0;
-    for (int i = 0; i < numVertices; i++) {
-        float newX = vs[i * 3] - x;
-        float newY = vs[i * 3 + 1] - y;
-        float newZ = vs[i * 3 + 2] - z;
+        float max = 0.0;
+        for (int i = 0; i < numVertices; i++) {
+            float newX = vs[i * 3] - x;
+            float newY = vs[i * 3 + 1] - y;
+            float newZ = vs[i * 3 + 2] - z;
 
-        float det = newX * newX + newY * newY + newZ * newZ;
-        max = det > max ? det : max;
-        
-        vs[i * 3] = newX;
-        vs[i * 3 + 1] = newY;
-        vs[i * 3 + 2] = newZ;
-    }
+            float det = newX * newX + newY * newY + newZ * newZ;
+            max = det > max ? det : max;
 
-    max = std::sqrt(max);
-    
-    // scaling down so that it's slightly smaller
-    max = 1.2 * max;
+            vs[i * 3] = newX;
+            vs[i * 3 + 1] = newY;
+            vs[i * 3 + 2] = newZ;
+        }
 
-    for (int i = 0; i < vs.size(); i++) {
-        vs[i] /= max;
+        // scaling down so that it's slightly smaller
+        max = 1.2 * std::sqrt(max);
+        if (max > 0) {
+            for (int i = 0; i < vs.size(); i++) {
+                vs[i] /= max;
+            }
+            fitScale = 1.0 / max;
+        }
     }
 
     //
