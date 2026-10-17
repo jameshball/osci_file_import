@@ -64,40 +64,39 @@ WorldObject::WorldObject(const std::string& obj_string, bool fit) {
 
     //
     // normalising object vertices: centred and scaled to fit the screen,
-    // unless kept as the file has them
+    // unless kept as the file has them (fitScale says how much fitting
+    // would scale them either way)
     //
-    if (fit) {
-        double x = 0.0, y = 0.0, z = 0.0;
-        for (int i = 0; i < numVertices; i++) {
-            x += vs[i * 3];
-            y += vs[i * 3 + 1];
-            z += vs[i * 3 + 2];
-        }
+    double x = 0.0, y = 0.0, z = 0.0;
+    for (int i = 0; i < numVertices; i++) {
+        x += vs[i * 3];
+        y += vs[i * 3 + 1];
+        z += vs[i * 3 + 2];
+    }
+    if (numVertices > 0) {
         x /= numVertices;
         y /= numVertices;
         z /= numVertices;
+    }
 
-        float max = 0.0;
+    double max = 0.0;
+    for (int i = 0; i < numVertices; i++) {
+        const double newX = vs[i * 3] - x;
+        const double newY = vs[i * 3 + 1] - y;
+        const double newZ = vs[i * 3 + 2] - z;
+        max = std::max(max, newX * newX + newY * newY + newZ * newZ);
+    }
+
+    // scaling down so that it's slightly smaller
+    max = 1.2 * std::sqrt(max);
+    if (max > 0) {
+        fitScale = 1.0 / max;
+    }
+    if (fit && max > 0) {
         for (int i = 0; i < numVertices; i++) {
-            float newX = vs[i * 3] - x;
-            float newY = vs[i * 3 + 1] - y;
-            float newZ = vs[i * 3 + 2] - z;
-
-            float det = newX * newX + newY * newY + newZ * newZ;
-            max = det > max ? det : max;
-
-            vs[i * 3] = newX;
-            vs[i * 3 + 1] = newY;
-            vs[i * 3 + 2] = newZ;
-        }
-
-        // scaling down so that it's slightly smaller
-        max = 1.2 * std::sqrt(max);
-        if (max > 0) {
-            for (int i = 0; i < vs.size(); i++) {
-                vs[i] /= max;
-            }
-            fitScale = 1.0 / max;
+            vs[i * 3] = static_cast<float>((vs[i * 3] - x) / max);
+            vs[i * 3 + 1] = static_cast<float>((vs[i * 3 + 1] - y) / max);
+            vs[i * 3 + 2] = static_cast<float>((vs[i * 3 + 2] - z) / max);
         }
     }
 

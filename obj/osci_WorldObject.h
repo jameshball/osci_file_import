@@ -16,6 +16,6 @@ public:
     std::vector<osci::Line> edges;
     std::vector<float> vs;
     int numVertices;
-    // How much fitting scaled the vertices (1 when kept as they were).
+    // How much fitting scales the vertices, whether or not it did.
     double fitScale = 1;
 };
