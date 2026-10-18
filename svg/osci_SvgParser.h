@@ -5,8 +5,15 @@
 
 class SvgParser {
 public:
-	SvgParser(juce::String svgFile);
+	// `reportErrors`: when it can't be read, say so in an alert and draw a
+	// cross in its place. Otherwise loaded() says, and it draws nothing.
+	SvgParser(juce::String svgFile, bool reportErrors = true);
 	~SvgParser();
+
+	bool loaded() const { return ok; }
+	// Whether JUCE can read it safely: it reads an SVG recursively, and
+	// thousands of nested elements overflow the stack.
+	static bool readable(const juce::String& svg);
 
 	static void pathToShapes(juce::Path& path, std::vector<std::unique_ptr<osci::Shape>>& shapes, bool normalise = false);
 
@@ -14,4 +21,5 @@ public:
 private:
 	
 	std::vector<std::unique_ptr<osci::Shape>> shapes;
+	bool ok = false;
 };
