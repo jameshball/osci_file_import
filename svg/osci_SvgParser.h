@@ -3,6 +3,13 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <osci_render_core/osci_render_core.h>
 
+namespace osci {
+// How deeply an XML document's elements nest, found without recursion:
+// JUCE reads XML recursively, and thousands of nested elements overflow
+// the stack.
+int xmlNestingDepth(const juce::String& xml);
+}
+
 class SvgParser {
 public:
 	// `reportErrors`: when it can't be read, say so in an alert and draw a

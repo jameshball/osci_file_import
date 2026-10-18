@@ -1,10 +1,9 @@
 #include "osci_SvgParser.h"
 
-namespace {
-// How deeply an SVG's elements nest, found without recursion (see readable).
-int svgNestingDepth(const juce::String& svg) {
+namespace osci {
+int xmlNestingDepth(const juce::String& xml) {
     int depth = 0, deepest = 0;
-    auto text = svg.getCharPointer();
+    auto text = xml.getCharPointer();
     while (!text.isEmpty()) {
         if (*text != '<') {
             ++text;
@@ -44,12 +43,14 @@ int svgNestingDepth(const juce::String& svg) {
 }
 
 bool SvgParser::readable(const juce::String& svg) {
-    return svgNestingDepth(svg) <= 256;
+    return osci::xmlNestingDepth(svg) <= 256;
 }
 
 SvgParser::SvgParser(juce::String svgFile, bool reportErrors) {
     if (svgFile.isNotEmpty() && readable(svgFile)) {
-        std::unique_ptr<juce::Drawable> svg = juce::Drawable::createFromImageData (svgFile.toRawUTF8(), svgFile.getNumBytesAsUTF8());
+        // Read as the text it is: guessing its encoding from its bytes again can
+        // read past their end when they hold damaged characters.
+        std::unique_ptr<juce::Drawable> svg = juce::Drawable::createFromSVGString (svgFile);
         juce::DrawableComposite* composite = dynamic_cast<juce::DrawableComposite*>(svg.get());
         if (composite != nullptr) {
             auto contentArea = composite->getContentArea();
