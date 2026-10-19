@@ -72,7 +72,7 @@ struct Failure : std::runtime_error { using std::runtime_error::runtime_error; }
 static void checkCancel(const std::atomic<bool>* flag) { if (cancelled(flag)) { throw Failure("Raster import cancelled."); } }
 static std::size_t canvasBytes(std::uint32_t width, std::uint32_t height) {
     if (width == 0 || height == 0 || width > osci::RasterDecoder::maximumDimension || height > osci::RasterDecoder::maximumDimension
-        || static_cast<std::size_t>(width) * height > osci::RasterDecoder::maximumPixels) { throw Failure("Raster dimensions must be 1-4096 with at most 16 million pixels."); }
+        || static_cast<std::size_t>(width) * height > osci::RasterDecoder::maximumPixels) { throw Failure("This picture is too big: it can be at most 4096 pixels on each side, and 16 million pixels in all. Make it smaller."); }
     return static_cast<std::size_t>(width) * height * 4;
 }
 struct Cursor {
@@ -149,7 +149,7 @@ static Gif inspectGif(const Byte* data, std::size_t size, const std::atomic<bool
         }
         if (marker != 0x2c) { throw Failure("GIF image block marker is invalid."); }
         if (gif.frames.size() >= osci::RasterDecoder::maximumFrames || gif.frames.size() + 1 > osci::RasterDecoder::maximumDecodedBytes / bytes) {
-            throw Failure("GIF exceeds 10000 frames or 256 MiB of decoded RGBA.");
+            throw Failure("This GIF is too long to prepare: at most 10,000 frames, and about 256 MB of pictures in all (480 x 270 is about 500 frames). Shorten it or make it smaller.");
         }
         GifFrame frame;
         frame.x = input.word();
