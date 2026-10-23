@@ -1,8 +1,56 @@
 #include "osci_SvgParser.h"
 
-SvgParser::SvgParser(juce::String svgFile) {
-    if (svgFile.isNotEmpty()) {
-        std::unique_ptr<juce::Drawable> svg = juce::Drawable::createFromImageData (svgFile.toRawUTF8(), svgFile.getNumBytesAsUTF8());
+namespace osci {
+int xmlNestingDepth(const juce::String& xml) {
+    int depth = 0, deepest = 0;
+    auto text = xml.getCharPointer();
+    while (!text.isEmpty()) {
+        if (*text != '<') {
+            ++text;
+            continue;
+        }
+        ++text;
+        if (text.isEmpty()) { break; }
+        // Comments, declarations and CDATA nest nothing.
+        if (*text == '!' || *text == '?') {
+            const auto comment = juce::CharacterFunctions::compareUpTo(text, juce::CharPointer_ASCII("!--"), 3) == 0;
+            const auto close = comment ? "-->" : ">";
+            const auto end = juce::CharacterFunctions::indexOf(text, juce::CharPointer_ASCII(close));
+            if (end < 0) { break; }
+            text += end;
+            continue;
+        }
+        const auto closing = *text == '/';
+        // To the tag's end, past quoted values that may hold '>'.
+        juce::juce_wchar quote = 0, previous = 0;
+        while (!text.isEmpty() && (quote != 0 || *text != '>')) {
+            if (quote != 0) {
+                if (*text == quote) { quote = 0; }
+            } else if (*text == '"' || *text == '\'') {
+                quote = *text;
+            }
+            previous = *text;
+            ++text;
+        }
+        if (closing) {
+            depth = std::max(0, depth - 1);
+        } else if (previous != '/') {
+            deepest = std::max(deepest, ++depth);
+        }
+    }
+    return deepest;
+}
+}
+
+bool SvgParser::readable(const juce::String& svg) {
+    return osci::xmlNestingDepth(svg) <= 256;
+}
+
+SvgParser::SvgParser(juce::String svgFile, bool reportErrors) {
+    if (svgFile.isNotEmpty() && readable(svgFile)) {
+        // Read as the text it is: guessing its encoding from its bytes again can
+        // read past their end when they hold damaged characters.
+        std::unique_ptr<juce::Drawable> svg = juce::Drawable::createFromSVGString (svgFile);
         juce::DrawableComposite* composite = dynamic_cast<juce::DrawableComposite*>(svg.get());
         if (composite != nullptr) {
             auto contentArea = composite->getContentArea();
@@ -13,11 +61,15 @@ SvgParser::SvgParser(juce::String svgFile) {
             // Instead of separate scaling for width and height, just get the path as is
             pathToShapes(path, shapes, true); // Enable normalization
             osci::Shape::removeOutOfBounds(shapes);
+            ok = true;
             return;
         }
     }
-    
-    juce::MessageManager::callAsync([this] {
+    if (!reportErrors) {
+        return;
+    }
+
+    juce::MessageManager::callAsync([] {
         juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::AlertIconType::WarningIcon, "Error", "The SVG could not be loaded.");
     });
     
