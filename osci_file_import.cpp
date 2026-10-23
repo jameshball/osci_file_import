@@ -11,5 +11,3 @@
 #include "third_party/chinese_postman/Matching.cpp"
 #include "obj/osci_WorldObject.cpp"
 #include "obj/osci_ObjectServer.cpp"
-
-#include "img/osci_RasterDecoder.cpp"
